@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
-import { HAND_HIT_ZONES, findActiveZone, HitZone } from "@/lib/hitZones";
+import { HAND_HIT_ZONES, FOOT_HIT_ZONES, findActiveZone, HitZone } from "@/lib/hitZones";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
 import { useGameStore } from "@/store/useGameStore";
 
@@ -198,8 +198,28 @@ export default function PoseTracker() {
         // Track which zones are active this frame
         const frameActiveZones = new Set<string>();
 
-        // ----- Draw hit zones (background layer) -----
-        for (const zone of HAND_HIT_ZONES) {
+        // ----- Draw alignment guide (background layer) -----
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([15, 15]);
+
+        // Draw a simple box in the center representing where the player should stand
+        const boxWidth = canvas.width * 0.4;
+        const boxHeight = canvas.height * 0.8;
+        const boxX = (canvas.width - boxWidth) / 2;
+        const boxY = (canvas.height - boxHeight) / 2;
+
+        ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        ctx.font = "bold 24px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("STAND HERE", canvas.width / 2, boxY + 40);
+        ctx.restore();
+
+        // ----- Draw hit zones -----
+        const allZones = [...HAND_HIT_ZONES, ...FOOT_HIT_ZONES];
+        for (const zone of allZones) {
             const isActive = activeZonesRef.current.has(zone.id);
             drawHitZone(ctx, zone, canvas.width, canvas.height, isActive);
         }
@@ -251,18 +271,37 @@ export default function PoseTracker() {
                 drawJoint(wrist.index, wrist.color);
             }
 
-            // Draw ankle dots (visual only for now, no audio)
+            // Process each ankle against FOOT_HIT_ZONES
             const ankles = [
                 { index: TARGET_JOINTS.leftAnkle, color: "#339af0" },
                 { index: TARGET_JOINTS.rightAnkle, color: "#fcc419" },
             ];
 
+            const drawAnkle = (index: number, color: string) => {
+                const landmark = poses[index];
+                if (landmark.visibility < 0.5) return;
+
+                const normX = landmark.x;
+                const normY = landmark.y;
+
+                // Check if ankle is in a foot zone
+                const hitZone = findActiveZone(normX, normY, FOOT_HIT_ZONES);
+                const isInZone = hitZone !== null;
+
+                if (hitZone) {
+                    frameActiveZones.add(hitZone.id);
+                    if (!activeZonesRef.current.has(hitZone.id)) {
+                        playZone(hitZone.id);
+                    }
+                }
+
+                const displayX = mirrorX(normX);
+                const displayY = normY * canvas.height;
+                drawWristDot(ctx, displayX, displayY, color, isInZone);
+            };
+
             for (const ankle of ankles) {
-                const landmark = poses[ankle.index];
-                if (!landmark || landmark.visibility < 0.5) continue;
-                const x = mirrorX(landmark.x);
-                const y = landmark.y * canvas.height;
-                drawWristDot(ctx, x, y, ankle.color, false);
+                drawAnkle(ankle.index, ankle.color);
             }
         }
 
