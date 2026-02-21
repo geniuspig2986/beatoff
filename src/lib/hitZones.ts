@@ -27,13 +27,13 @@ export interface HitZone {
 // C major pentatonic: C4, D4, E4, G4, A4, C5
 // Left zones = lower notes, Right zones = higher notes
 export const HAND_HIT_ZONES: HitZone[] = [
-    // Left side (MediaPipe right, since un-mirrored) — positioned at ~75% X
+    // Left side (MediaPipe right, since un-mirrored) — brought closer to center
     {
         id: "L0",
         label: "C4",
-        x: 0.78,
-        y: 0.22,
-        size: 0.14,
+        x: 0.65,
+        y: 0.25,
+        size: 0.10,
         note: "C4",
         color: "rgba(168, 85, 247, 0.4)",   // Purple
         glowColor: "rgba(168, 85, 247, 0.9)",
@@ -41,9 +41,9 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "L1",
         label: "D4",
-        x: 0.78,
+        x: 0.65,
         y: 0.45,
-        size: 0.14,
+        size: 0.10,
         note: "D4",
         color: "rgba(139, 92, 246, 0.4)",   // Indigo
         glowColor: "rgba(139, 92, 246, 0.9)",
@@ -51,20 +51,20 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "L2",
         label: "E4",
-        x: 0.78,
-        y: 0.68,
-        size: 0.14,
+        x: 0.65,
+        y: 0.65,
+        size: 0.10,
         note: "E4",
         color: "rgba(99, 102, 241, 0.4)",   // Blue-indigo
         glowColor: "rgba(99, 102, 241, 0.9)",
     },
-    // Right side (MediaPipe left, since un-mirrored) — positioned at ~25% X
+    // Right side (MediaPipe left, since un-mirrored) — brought closer to center
     {
         id: "R0",
         label: "G4",
-        x: 0.22,
-        y: 0.22,
-        size: 0.14,
+        x: 0.35,
+        y: 0.25,
+        size: 0.10,
         note: "G4",
         color: "rgba(236, 72, 153, 0.4)",   // Pink
         glowColor: "rgba(236, 72, 153, 0.9)",
@@ -72,9 +72,9 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "R1",
         label: "A4",
-        x: 0.22,
+        x: 0.35,
         y: 0.45,
-        size: 0.14,
+        size: 0.10,
         note: "A4",
         color: "rgba(244, 63, 94, 0.4)",    // Rose
         glowColor: "rgba(244, 63, 94, 0.9)",
@@ -82,13 +82,60 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "R2",
         label: "C5",
-        x: 0.22,
-        y: 0.68,
-        size: 0.14,
+        x: 0.35,
+        y: 0.65,
+        size: 0.10,
         note: "C5",
         color: "rgba(251, 113, 133, 0.4)",  // Light rose
         glowColor: "rgba(251, 113, 133, 0.9)",
     },
+];
+
+// Footer zones (Drums)
+// Kick (C2), Snare (D2), Hi-Hat (E2), Crash (F2)
+export const FOOT_HIT_ZONES: HitZone[] = [
+    // Left Foot (MediaPipe right)
+    {
+        id: "FL0",
+        label: "KICK",
+        x: 0.62,
+        y: 0.78,
+        size: 0.08,
+        note: "C2",
+        color: "rgba(234, 88, 12, 0.4)",  // Orange
+        glowColor: "rgba(234, 88, 12, 0.9)",
+    },
+    {
+        id: "FL1",
+        label: "SNARE",
+        x: 0.55,
+        y: 0.88,
+        size: 0.08,
+        note: "D2",
+        color: "rgba(234, 179, 8, 0.4)",  // Yellow
+        glowColor: "rgba(234, 179, 8, 0.9)",
+    },
+    // Right Foot (MediaPipe left)
+    {
+        id: "FR0",
+        label: "HI-HAT",
+        x: 0.45,
+        y: 0.88,
+        size: 0.08,
+        note: "E2",
+        color: "rgba(34, 197, 94, 0.4)",  // Green
+        glowColor: "rgba(34, 197, 94, 0.9)",
+    },
+    {
+        id: "FR1",
+        label: "CRASH",
+        x: 0.38,
+        y: 0.78,
+        size: 0.08,
+        note: "F2",
+        color: "rgba(6, 182, 212, 0.4)",  // Cyan
+        glowColor: "rgba(6, 182, 212, 0.9)",
+    }
 ];
 
 /**
