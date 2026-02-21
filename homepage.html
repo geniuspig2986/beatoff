@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BeatOff – The Rhythm Battle</title>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0514;
+      --purple-deep: #1a0828;
+      --purple-mid: #2d1050;
+      --accent-purple: #7c3aed;
+      --accent-pink: #ec4899;
+      --accent-orange: #f97316;
+      --gold: #f59e0b;
+      --text: #f1e8ff;
+      --text-muted: #8b7aa0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Animated background ── */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, #3b0764 0%, transparent 65%),
+        radial-gradient(ellipse 40% 40% at 10% 80%, #1e0740 0%, transparent 60%),
+        radial-gradient(ellipse 30% 30% at 90% 70%, #2d0a50 0%, transparent 60%),
+        var(--bg);
+    }
+
+    /* Subtle scanlines */
+    .bg-layer::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.08) 3px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* Grid lines */
+    .grid-lines {
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(124,58,237,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,58,237,0.06) 1px, transparent 1px);
+      background-size: 60px 60px;
+      perspective: 400px;
+    }
+
+    /* Floating particles */
+    .particles { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      animation: float linear infinite;
+      opacity: 0;
+    }
+    @keyframes float {
+      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: 0.6; }
+      90%  { opacity: 0.3; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    /* ── Layout ── */
+    .page {
+      position: relative; z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 36px;
+      padding: 24px;
+    }
+
+    /* ── Logo ── */
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      animation: fadeDown 0.7s ease both;
+    }
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-icon {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 0 24px rgba(124,58,237,0.7), 0 0 60px rgba(124,58,237,0.3);
+      position: relative;
+      animation: pulse-icon 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-icon {
+      0%, 100% { box-shadow: 0 0 24px rgba(124,58,237,0.7), 0 0 60px rgba(124,58,237,0.3); }
+      50%       { box-shadow: 0 0 36px rgba(124,58,237,0.9), 0 0 80px rgba(236,72,153,0.4); }
+    }
+
+    .logo-text {
+      font-family: 'Black Ops One', cursive;
+      font-size: 64px;
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .logo-beat { color: #c084fc; }
+    .logo-off  { color: var(--accent-pink); }
+
+    .tagline {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.25em;
+      color: var(--text-muted);
+      text-align: center;
+      animation: fadeDown 0.7s 0.15s ease both;
+    }
+
+    /* ── Sub-headline ── */
+    .headline {
+      font-size: 16px;
+      color: #c4b5d4;
+      text-align: center;
+      max-width: 440px;
+      line-height: 1.5;
+      animation: fadeUp 0.7s 0.25s ease both;
+    }
+
+    /* ── Theme selector ── */
+    .theme-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      animation: fadeUp 0.7s 0.35s ease both;
+    }
+
+    .theme-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.3em;
+      color: var(--text-muted);
+    }
+
+    .themes {
+      display: flex;
+      gap: 14px;
+    }
+
+    .theme-card {
+      width: 176px;
+      background: rgba(30, 8, 60, 0.6);
+      border: 1px solid rgba(124,58,237,0.25);
+      border-radius: 14px;
+      padding: 20px 14px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+      user-select: none;
+      position: relative;
+    }
+    .theme-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(124,58,237,0.5);
+      background: rgba(45, 16, 80, 0.7);
+    }
+    .theme-card.active {
+      border-color: var(--gold);
+      background: rgba(50, 20, 10, 0.7);
+      box-shadow: 0 0 20px rgba(245,158,11,0.35), inset 0 0 20px rgba(245,158,11,0.05);
+    }
+    .theme-card.active::after {
+      content: '';
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    .theme-icon { font-size: 30px; }
+
+    .theme-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .theme-desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    /* ── Start button ── */
+    .start-btn {
+      width: 340px;
+      padding: 20px 0;
+      border: none;
+      border-radius: 50px;
+      background: linear-gradient(90deg, #a855f7, #ec4899);
+      font-family: 'Black Ops One', cursive;
+      font-size: 22px;
+      letter-spacing: 0.1em;
+      color: #fff;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 30px rgba(168,85,247,0.5), 0 0 60px rgba(236,72,153,0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      animation: fadeUp 0.7s 0.5s ease both;
+    }
+    .start-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.1), transparent, rgba(255,255,255,0.1));
+      transform: translateX(-100%);
+      transition: transform 0.4s ease;
+    }
+    .start-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 0 40px rgba(168,85,247,0.7), 0 0 80px rgba(236,72,153,0.4); }
+    .start-btn:hover::before { transform: translateX(100%); }
+    .start-btn:active { transform: scale(0.97); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+<div class="grid-lines"></div>
+<div class="particles" id="particles"></div>
+
+<div class="page">
+  <div>
+    <div class="logo-wrap">
+      <div class="logo-icon">🎵</div>
+      <div class="logo-text">
+        <span class="logo-beat">BEAT</span><span class="logo-off">OFF</span>
+      </div>
+    </div>
+    <p class="tagline">T H E &nbsp; R H Y T H M &nbsp; B A T T L E</p>
+  </div>
+
+  <p class="headline">Move your hands &amp; feet into the glowing zones. Let the AI judge roast you.</p>
+
+  <div class="theme-section">
+    <span class="theme-label">CHOOSE YOUR THEME</span>
+    <div class="themes">
+      <div class="theme-card active" data-theme="ragtime" onclick="selectTheme(this)">
+        <span class="theme-icon">🎹</span>
+        <span class="theme-name">Ragtime Ruckus</span>
+        <span class="theme-desc">Syncopate or Perish</span>
+      </div>
+      <div class="theme-card" data-theme="cyberpunk" onclick="selectTheme(this)">
+        <span class="theme-icon">🏙️</span>
+        <span class="theme-name">Cyberpunk Synthwave</span>
+        <span class="theme-desc">Jack into the Grid</span>
+      </div>
+      <div class="theme-card" data-theme="jazz" onclick="selectTheme(this)">
+        <span class="theme-icon">🎷</span>
+        <span class="theme-name">Sleazy Jazz</span>
+        <span class="theme-desc">It's Smooth. It's Sweaty.</span>
+      </div>
+      <div class="theme-card" data-theme="lofi" onclick="selectTheme(this)">
+        <span class="theme-icon">🌙</span>
+        <span class="theme-name">Lo-fi Chill Beats</span>
+        <span class="theme-desc">Study / Relax / Dissociate</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="start-btn" onclick="startGame()">START GAME</button>
+</div>
+
+<script>
+  // Particles
+  const container = document.getElementById('particles');
+  const colors = ['#a855f7','#ec4899','#f97316','#f59e0b','#c084fc'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 5 + 2;
+    p.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${6 + Math.random()*10}s;
+      animation-delay:${Math.random()*8}s;
+    `;
+    container.appendChild(p);
+  }
+
+  function selectTheme(el) {
+    document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function startGame() {
+    const btn = document.querySelector('.start-btn');
+    btn.textContent = 'GET READY...';
+    btn.style.background = 'linear-gradient(90deg, #f97316, #ec4899)';
+  }
+</script>
+</body>
+</html>
