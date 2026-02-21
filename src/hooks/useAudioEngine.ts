@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { initAudio, triggerNote, disposeAudio, isAudioReady } from "@/lib/audioEngine";
+import { initAudio, triggerNote, disposeAudio, isAudioReady, getAudioDestination } from "@/lib/audioEngine";
 import { HAND_HIT_ZONES, FOOT_HIT_ZONES } from "@/lib/hitZones";
 
 // No time-based cooldown; notes trigger ONCE upon entering a zone
@@ -32,6 +32,17 @@ export function useAudioEngine() {
         return true;
     }, []);
 
+    const getAudioStream = useCallback(() => {
+        const dest = getAudioDestination();
+        if (dest && dest.context) {
+            // Create a media stream destination
+            const mediaStreamDest = dest.context.createMediaStreamDestination();
+            dest.connect(mediaStreamDest);
+            return mediaStreamDest.stream;
+        }
+        return null;
+    }, []);
+
     /**
      * Cleanup — call in useEffect unmount
      */
@@ -39,5 +50,5 @@ export function useAudioEngine() {
         disposeAudio();
     }, []);
 
-    return { startAudio, playZone, cleanup };
+    return { startAudio, playZone, getAudioStream, cleanup };
 }

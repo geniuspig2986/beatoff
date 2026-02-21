@@ -68,6 +68,14 @@ export function isAudioReady(): boolean {
 }
 
 /**
+ * Get Tone destination to hook into a MediaRecorder
+ */
+export function getAudioDestination(): Tone.ToneAudioNode | null {
+  if (!isInitialized) return null;
+  return Tone.getDestination();
+}
+
+/**
  * Cleanup: dispose the synths. Call on unmount.
  */
 export function disposeAudio(): void {

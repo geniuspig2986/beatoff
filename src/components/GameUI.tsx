@@ -16,6 +16,8 @@ export default function GameUI() {
         player1Sequence, player2Sequence,
         activeTheme, setActiveTheme,
         judgeFeedback, setJudgeFeedback,
+        twitterPermission, setTwitterPermission,
+        recordedVideoBlob, setRecordedVideoBlob,
         resetGame
     } = useGameStore();
 
@@ -44,6 +46,16 @@ export default function GameUI() {
 
         return () => clearInterval(timerId);
     }, [gameState, timeLeft, currentPlayer]);
+
+    const handlePlayClick = () => {
+        // If permission has not been set yet, don't start the game; show the modal
+        if (twitterPermission === null) {
+            // We'll reveal the modal by setting gameState to a new temporary state, 
+            // but for simplicity let's just use local state or handle it within IDLE
+            return;
+        }
+        startGame();
+    };
 
     const startGame = async () => {
         await initAudio();
@@ -87,6 +99,36 @@ export default function GameUI() {
 
             // Mock data logic assumes the backend passes back {roast, scoreP1, scoreP2, audioUrl}
             setJudgeFeedback(data);
+            // MOCK: wait a short tick to let MediaRecorder finish generating the blob
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            // Optional: Upload to Twitter if permitted
+            // We use standard React state check, or the store's current value.
+            // Since we need the *latest* blob, we might rely on a store slice getter or local state, 
+            // but for simplicity, useGameStore.getState() gets the very latest blob
+            const latestState = useGameStore.getState();
+            if (latestState.twitterPermission && latestState.recordedVideoBlob) {
+                try {
+                    console.log("Uploading video to Twitter...");
+                    const formData = new FormData();
+                    formData.append("video", latestState.recordedVideoBlob, "performance.webm");
+                    formData.append("score", String(data.scoreP1)); // or aggregate
+                    formData.append("roast", data.roast);
+
+                    const tweetResponse = await fetch("http://localhost:8000/api/social/twitter", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    if (tweetResponse.ok) {
+                        const tweetData = await tweetResponse.json();
+                        console.log("Tweet successful!", tweetData.url);
+                    }
+                } catch (e) {
+                    console.error("Failed to post to Twitter", e);
+                }
+            }
+
             setGameState('RESULT');
         } catch (e) {
             console.error("Evaluation Error", e);
@@ -132,7 +174,29 @@ export default function GameUI() {
                     </div>
                 )}
 
-                {gameState === 'IDLE' && isModelLoaded && (
+                {gameState === 'IDLE' && isModelLoaded && twitterPermission === null && (
+                    <div className="flex flex-col items-center justify-center bg-gray-900/90 p-8 rounded-2xl border-2 border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.4)] backdrop-blur-md max-w-lg text-center gap-6">
+                        <h2 className="text-3xl font-black text-white">Share to Twitter?</h2>
+                        <p className="text-gray-300 text-lg">
+                            We'd love to record your sweet (or terrible) performance and post it to X along with the AI Judge's roast!
+                        </p>
+                        <div className="flex gap-4 w-full justify-center mt-4">
+                            <button
+                                onClick={() => setTwitterPermission(false)}
+                                className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full text-lg transition-all border border-gray-500">
+                                No Thanks
+                            </button>
+                            <button
+                                onClick={() => { setTwitterPermission(true); }}
+                                className="bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-8 rounded-full text-lg shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all flex items-center gap-2">
+                                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                                Yes, Post It!
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {gameState === 'IDLE' && isModelLoaded && twitterPermission !== null && (
                     <div className="flex gap-4">
                         <button
                             onClick={startGame}
