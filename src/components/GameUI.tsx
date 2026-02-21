@@ -137,7 +137,7 @@ export default function GameUI() {
                         <button
                             onClick={startGame}
                             className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full text-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all">
-                            Start Couch Co-op
+                            Play BeatOff!
                         </button>
                     </div>
                 )}

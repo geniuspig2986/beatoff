@@ -19,7 +19,7 @@ export default function PoseTracker() {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const { isModelLoaded, setIsModelLoaded } = useGameStore();
+    const { isModelLoaded, setIsModelLoaded, addEvent } = useGameStore();
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
     // Track which zones are currently active for visual feedback
@@ -234,6 +234,10 @@ export default function PoseTracker() {
                     // Only play if it wasn't already active last frame (infinite cooldown)
                     if (!activeZonesRef.current.has(hitZone.id)) {
                         playZone(hitZone.id);
+                        addEvent({
+                            timestamp: performance.now(),
+                            limb: hitZone.id
+                        });
                     }
                 }
 
