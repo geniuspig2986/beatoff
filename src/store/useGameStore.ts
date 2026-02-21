@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 
-export type GameMode = 'SINGLE' | 'COOP';
 export type GameState = 'IDLE' | 'GET_READY' | 'RECORDING' | 'EVALUATING' | 'RESULT';
 
 export type RecordedEvent = {
@@ -10,8 +9,6 @@ export type RecordedEvent = {
 
 interface GameStore {
     // Config
-    gameMode: GameMode;
-    setGameMode: (mode: GameMode) => void;
     activeTheme: string;
     setActiveTheme: (theme: string) => void;
 
@@ -46,9 +43,6 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set) => ({
-    gameMode: 'SINGLE',
-    setGameMode: (mode) => set({ gameMode: mode }),
-
     activeTheme: '8-Bit Boss Battle',
     setActiveTheme: (theme) => set({ activeTheme: theme }),
 

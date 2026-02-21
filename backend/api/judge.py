@@ -14,9 +14,8 @@ class RecordedEvent(BaseModel):
 
 class FreestylePayload(BaseModel):
     theme: str
-    gameMode: str
     player1Sequence: List[RecordedEvent]
-    player2Sequence: Optional[List[RecordedEvent]] = None
+    player2Sequence: List[RecordedEvent]
 
 class JudgeResponse(BaseModel):
     scoreP1: int = Field(description="Score for player 1, from 0 to 100")
@@ -42,18 +41,13 @@ def evaluate_freestyle(payload: FreestylePayload):
         raise HTTPException(status_code=500, detail="Gemini Client is not initialized. Check GEMINI_API_KEY.")
     
     p1_events = len(payload.player1Sequence)
-    p2_events = len(payload.player2Sequence) if payload.player2Sequence else 0
+    p2_events = len(payload.player2Sequence)
     
-    if payload.gameMode == 'COOP':
-        context = f"""
-        Player 1 hit {p1_events} notes. 
-        Player 2 hit {p2_events} notes.
-        Compare their performances.
-        """
-    else:
-        context = f"""
-        Player 1 hit {p1_events} notes.
-        """
+    context = f"""
+    Player 1 hit {p1_events} notes. 
+    Player 2 hit {p2_events} notes.
+    Compare their performances.
+    """
 
     prompt = f"""
     You are a harsh, sarcastic, Gordon Ramsay-esque music critic.
