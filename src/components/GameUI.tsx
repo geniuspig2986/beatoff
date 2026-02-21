@@ -11,7 +11,6 @@ export default function GameUI() {
     const {
         gameState, setGameState,
         isModelLoaded,
-        gameMode, setGameMode,
         currentPlayer, setCurrentPlayer,
         timeLeft, setTimeLeft, decrementTime,
         player1Sequence, player2Sequence,
@@ -46,7 +45,8 @@ export default function GameUI() {
         return () => clearInterval(timerId);
     }, [gameState, timeLeft, currentPlayer]);
 
-    const startGame = () => {
+    const startGame = async () => {
+        await initAudio();
         resetGame();
         setGameState('GET_READY');
         setTimeLeft(GAME_LENGTH_SECONDS); // Using 15s for testing, 60s for actual game
