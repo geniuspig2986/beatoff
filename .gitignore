@@ -40,3 +40,4 @@ venv/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+cursorrules.md
