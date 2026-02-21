@@ -20,7 +20,7 @@ export default function PoseTracker() {
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number>(undefined);
 
     // Initialize MediaPipe PoseLandmarker
     useEffect(() => {
@@ -107,8 +107,8 @@ export default function PoseTracker() {
             // Helper to draw a joint
             const drawJoint = (index: number, color: string) => {
                 const landmark = poses[index];
-                // If presence or visibility is too low, don't draw
-                if (landmark.presence < 0.5 || landmark.visibility < 0.5) return;
+                // If visibility is too low, don't draw
+                if (landmark.visibility < 0.5) return;
 
                 const x = mirrorX(landmark.x);
                 const y = landmark.y * canvas.height;
