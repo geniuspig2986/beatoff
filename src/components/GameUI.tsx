@@ -32,28 +32,22 @@ export default function GameUI() {
         }
         // State transitions based on timer
         else if (gameState === 'RECORDING' && timeLeft === 0) {
-            if (gameMode === 'SINGLE') {
+            if (currentPlayer === 1) {
+                // Transition to Player 2
+                setGameState('GET_READY');
+                setCurrentPlayer(2);
+                setTimeLeft(GAME_LENGTH_SECONDS);
+            } else {
+                // Both players finished
                 finishRecordingAndEvaluate();
-            } else if (gameMode === 'COOP') {
-                if (currentPlayer === 1) {
-                    // Transition to Player 2
-                    setGameState('GET_READY');
-                    setCurrentPlayer(2);
-                    setTimeLeft(GAME_LENGTH_SECONDS);
-                } else {
-                    // Both players finished
-                    finishRecordingAndEvaluate();
-                }
             }
         }
 
         return () => clearInterval(timerId);
-    }, [gameState, timeLeft, gameMode, currentPlayer]);
+    }, [gameState, timeLeft, currentPlayer]);
 
-    const startGame = async (mode: 'SINGLE' | 'COOP') => {
-        await initAudio();
+    const startGame = () => {
         resetGame();
-        setGameMode(mode);
         setGameState('GET_READY');
         setTimeLeft(GAME_LENGTH_SECONDS); // Using 15s for testing, 60s for actual game
 
@@ -75,9 +69,9 @@ export default function GameUI() {
             // (Hitboxes not defined, so data arrays are empty or mock for now)
             const payload = {
                 theme: activeTheme,
-                gameMode: gameMode,
+                gameMode: 'COOP',
                 player1Sequence: player1Sequence,
-                player2Sequence: gameMode === 'COOP' ? player2Sequence : undefined
+                player2Sequence: player2Sequence
             };
 
             // Note: URL hardcoded to typical FastAPI uvicorn start port for local demo
@@ -116,8 +110,7 @@ export default function GameUI() {
                         Theme: {activeTheme}
                     </h2>
                     <div className="text-sm text-gray-300">
-                        {gameMode === 'COOP' && <p>Co-Op Mode - Player {currentPlayer}</p>}
-                        {gameMode === 'SINGLE' && <p>Freestyle Session</p>}
+                        <p>Co-Op Mode - Player {currentPlayer}</p>
                     </div>
                 </div>
 
@@ -142,14 +135,9 @@ export default function GameUI() {
                 {gameState === 'IDLE' && isModelLoaded && (
                     <div className="flex gap-4">
                         <button
-                            onClick={() => startGame('SINGLE')}
-                            className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-full text-xl shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all">
-                            Start Freestyle
-                        </button>
-                        <button
-                            onClick={() => startGame('COOP')}
+                            onClick={startGame}
                             className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-full text-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all">
-                            Couch Co-op
+                            Start Couch Co-op
                         </button>
                     </div>
                 )}
@@ -184,7 +172,7 @@ export default function GameUI() {
                 {gameState === 'RESULT' && judgeFeedback && (
                     <div className="bg-gray-900 border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.4)] p-8 text-center max-w-2xl rounded-2xl">
                         <h2 className="text-4xl font-black text-yellow-400 mb-6 uppercase tracking-wider">
-                            {gameMode === 'COOP' ? `Winner: Player ${judgeFeedback.winner}` : 'Final Score'}
+                            Winner: Player {judgeFeedback.winner}
                         </h2>
 
                         <div className="flex justify-center gap-12 mb-6">
@@ -192,12 +180,10 @@ export default function GameUI() {
                                 <div className="text-gray-400 text-sm uppercase">Player 1</div>
                                 <div className="text-5xl font-bold text-white">{judgeFeedback.scoreP1}</div>
                             </div>
-                            {gameMode === 'COOP' && (
-                                <div>
-                                    <div className="text-gray-400 text-sm uppercase">Player 2</div>
-                                    <div className="text-5xl font-bold text-white">{judgeFeedback.scoreP2}</div>
-                                </div>
-                            )}
+                            <div>
+                                <div className="text-gray-400 text-sm uppercase">Player 2</div>
+                                <div className="text-5xl font-bold text-white">{judgeFeedback.scoreP2}</div>
+                            </div>
                         </div>
 
                         <p className="text-xl text-gray-200 italic">&ldquo;{judgeFeedback.roast}&rdquo;</p>
