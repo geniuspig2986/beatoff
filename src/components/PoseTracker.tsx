@@ -90,7 +90,11 @@ export default function PoseTracker() {
         // Mirror X for display (webcam is mirrored)
         const cx = canvasW - zone.x * canvasW;
         const cy = zone.y * canvasH;
-        const r = zone.radius * Math.max(canvasW, canvasH);
+
+        // Scale size to keep it square on screen
+        const s = zone.size * Math.max(canvasW, canvasH);
+        const minX = cx - s / 2;
+        const minY = cy - s / 2;
 
         ctx.save();
 
@@ -99,28 +103,28 @@ export default function PoseTracker() {
             ctx.shadowColor = zone.glowColor;
             ctx.shadowBlur = 30;
 
-            // Bright filled circle
+            // Bright filled square
             ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.roundRect(minX, minY, s, s, 10);
             ctx.fillStyle = zone.glowColor;
             ctx.fill();
 
-            // Inner bright ring
+            // Inner bright square ring
             ctx.beginPath();
-            ctx.arc(cx, cy, r * 0.6, 0, 2 * Math.PI);
+            ctx.roundRect(minX + s * 0.2, minY + s * 0.2, s * 0.6, s * 0.6, 6);
             ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
             ctx.lineWidth = 3;
             ctx.stroke();
         } else {
-            // Idle state — semi-transparent ring
+            // Idle state — semi-transparent square
             ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.roundRect(minX, minY, s, s, 10);
             ctx.fillStyle = zone.color;
             ctx.fill();
 
-            // Border ring
+            // Border square
             ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.roundRect(minX, minY, s, s, 10);
             ctx.strokeStyle = zone.glowColor.replace("0.9", "0.6");
             ctx.lineWidth = 2;
             ctx.stroke();
@@ -128,7 +132,7 @@ export default function PoseTracker() {
 
         // Note label
         ctx.shadowBlur = 0;
-        ctx.font = `bold ${Math.max(14, r * 0.45)}px monospace`;
+        ctx.font = `bold ${Math.max(14, s * 0.3)}px monospace`;
         ctx.fillStyle = isActive ? "#fff" : "rgba(255, 255, 255, 0.7)";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -230,7 +234,10 @@ export default function PoseTracker() {
 
                 if (hitZone) {
                     frameActiveZones.add(hitZone.id);
-                    playZone(hitZone.id); // Hook handles cooldown
+                    // Only play if it wasn't already active last frame (infinite cooldown)
+                    if (!activeZonesRef.current.has(hitZone.id)) {
+                        playZone(hitZone.id);
+                    }
                 }
 
                 // Draw the wrist dot (mirrored for display)

@@ -14,8 +14,8 @@ export interface HitZone {
     x: number;
     /** Normalized Y position (0 = top, 1 = bottom) */
     y: number;
-    /** Collision radius in normalized space */
-    radius: number;
+    /** Size (width and height) in normalized space */
+    size: number;
     /** Musical note to play when hit */
     note: string;
     /** Display color (CSS) */
@@ -33,7 +33,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "C4",
         x: 0.78,
         y: 0.22,
-        radius: 0.07,
+        size: 0.14,
         note: "C4",
         color: "rgba(168, 85, 247, 0.4)",   // Purple
         glowColor: "rgba(168, 85, 247, 0.9)",
@@ -43,7 +43,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "D4",
         x: 0.78,
         y: 0.45,
-        radius: 0.07,
+        size: 0.14,
         note: "D4",
         color: "rgba(139, 92, 246, 0.4)",   // Indigo
         glowColor: "rgba(139, 92, 246, 0.9)",
@@ -53,7 +53,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "E4",
         x: 0.78,
         y: 0.68,
-        radius: 0.07,
+        size: 0.14,
         note: "E4",
         color: "rgba(99, 102, 241, 0.4)",   // Blue-indigo
         glowColor: "rgba(99, 102, 241, 0.9)",
@@ -64,7 +64,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "G4",
         x: 0.22,
         y: 0.22,
-        radius: 0.07,
+        size: 0.14,
         note: "G4",
         color: "rgba(236, 72, 153, 0.4)",   // Pink
         glowColor: "rgba(236, 72, 153, 0.9)",
@@ -74,7 +74,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "A4",
         x: 0.22,
         y: 0.45,
-        radius: 0.07,
+        size: 0.14,
         note: "A4",
         color: "rgba(244, 63, 94, 0.4)",    // Rose
         glowColor: "rgba(244, 63, 94, 0.9)",
@@ -84,7 +84,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "C5",
         x: 0.22,
         y: 0.68,
-        radius: 0.07,
+        size: 0.14,
         note: "C5",
         color: "rgba(251, 113, 133, 0.4)",  // Light rose
         glowColor: "rgba(251, 113, 133, 0.9)",
@@ -100,9 +100,13 @@ export function checkZoneHit(
     wy: number,
     zone: HitZone
 ): boolean {
-    const dx = wx - zone.x;
-    const dy = wy - zone.y;
-    return Math.sqrt(dx * dx + dy * dy) <= zone.radius;
+    const halfSize = zone.size / 2;
+    return (
+        wx >= zone.x - halfSize &&
+        wx <= zone.x + halfSize &&
+        wy >= zone.y - halfSize &&
+        wy <= zone.y + halfSize
+    );
 }
 
 /**

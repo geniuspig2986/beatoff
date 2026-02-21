@@ -4,13 +4,12 @@ import { useState, useRef, useCallback } from "react";
 import { initAudio, triggerNote, disposeAudio } from "@/lib/audioEngine";
 import { HAND_HIT_ZONES } from "@/lib/hitZones";
 
-const COOLDOWN_MS = 300; // Minimum ms between re-triggers of the same zone
+// No time-based cooldown; notes trigger ONCE upon entering a zone
 
 export function useAudioEngine() {
     const [isReady, setIsReady] = useState(false);
 
-    // Map of zone ID → last trigger timestamp
-    const cooldownMap = useRef<Map<string, number>>(new Map());
+    // Removed time-based cooldown map, tracked physically in PoseTracker
 
     /**
      * Start the Tone.js AudioContext. Must be called from a user gesture.
@@ -25,24 +24,16 @@ export function useAudioEngine() {
     }, []);
 
     /**
-     * Play the note mapped to a zone, respecting cooldown.
-     * Returns true if the note was actually played (not on cooldown).
+     * Play the note mapped to a zone immediately.
+     * Returns true if the note was successfully triggered.
      */
     const playZone = useCallback((zoneId: string): boolean => {
         if (!isReady) return false;
-
-        const now = performance.now();
-        const lastPlayed = cooldownMap.current.get(zoneId) ?? 0;
-
-        if (now - lastPlayed < COOLDOWN_MS) {
-            return false; // Still on cooldown
-        }
 
         const zone = HAND_HIT_ZONES.find((z) => z.id === zoneId);
         if (!zone) return false;
 
         triggerNote(zone.note);
-        cooldownMap.current.set(zoneId, now);
         return true;
     }, [isReady]);
 
