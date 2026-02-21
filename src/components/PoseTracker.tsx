@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
-import { Loader2 } from "lucide-react";
+import { Loader2, Play } from "lucide-react";
+import { HAND_HIT_ZONES, findActiveZone, HitZone } from "@/lib/hitZones";
+import { useAudioEngine } from "@/hooks/useAudioEngine";
 
 // The indices for the joints we care about in the MediaPipe topology
 const TARGET_JOINTS = {
@@ -20,7 +22,13 @@ export default function PoseTracker() {
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number | undefined>(undefined);
+
+    // Track which zones are currently active for visual feedback
+    const activeZonesRef = useRef<Set<string>>(new Set());
+
+    // Audio engine
+    const { isReady: isAudioReady, startAudio, playZone, cleanup: cleanupAudio } = useAudioEngine();
 
     // Initialize MediaPipe PoseLandmarker
     useEffect(() => {
@@ -34,12 +42,11 @@ export default function PoseTracker() {
 
                 const landmarker = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        // We downloaded this file into the public directory
                         modelAssetPath: "/pose_landmarker_lite.task",
                         delegate: "GPU",
                     },
                     runningMode: "VIDEO",
-                    numPoses: 1, // Only tracking one person for now
+                    numPoses: 1,
                 });
 
                 if (active) {
@@ -61,10 +68,101 @@ export default function PoseTracker() {
             if (requestRef.current) {
                 cancelAnimationFrame(requestRef.current);
             }
+            cleanupAudio();
         };
     }, []);
 
-    // Tracking Loop
+    // Handle start button — unlocks audio and starts tracking
+    const handleStart = useCallback(async () => {
+        await startAudio();
+        setIsPlaying(true);
+    }, [startAudio]);
+
+    // ----- Drawing Helpers -----
+
+    const drawHitZone = (
+        ctx: CanvasRenderingContext2D,
+        zone: HitZone,
+        canvasW: number,
+        canvasH: number,
+        isActive: boolean
+    ) => {
+        // Mirror X for display (webcam is mirrored)
+        const cx = canvasW - zone.x * canvasW;
+        const cy = zone.y * canvasH;
+        const r = zone.radius * Math.max(canvasW, canvasH);
+
+        ctx.save();
+
+        if (isActive) {
+            // Glow effect when hit
+            ctx.shadowColor = zone.glowColor;
+            ctx.shadowBlur = 30;
+
+            // Bright filled circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.fillStyle = zone.glowColor;
+            ctx.fill();
+
+            // Inner bright ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.6, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        } else {
+            // Idle state — semi-transparent ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.fillStyle = zone.color;
+            ctx.fill();
+
+            // Border ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+            ctx.strokeStyle = zone.glowColor.replace("0.9", "0.6");
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Note label
+        ctx.shadowBlur = 0;
+        ctx.font = `bold ${Math.max(14, r * 0.45)}px monospace`;
+        ctx.fillStyle = isActive ? "#fff" : "rgba(255, 255, 255, 0.7)";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(zone.label, cx, cy);
+
+        ctx.restore();
+    };
+
+    const drawWristDot = (
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        color: string,
+        isInZone: boolean
+    ) => {
+        const dotRadius = isInZone ? 14 : 8;
+
+        ctx.save();
+        if (isInZone) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
+        }
+        ctx.beginPath();
+        ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    };
+
+    // ----- Main Render Loop -----
+
     const renderLoop = () => {
         if (
             !isPlaying ||
@@ -91,50 +189,80 @@ export default function PoseTracker() {
             canvas.height = video.videoHeight;
         }
 
-        // Clear previous frame drawn
+        // Clear previous frame
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Get the pose estimation
         const startTimeMs = performance.now();
         const results = poseLandmarkerRef.current.detectForVideo(video, startTimeMs);
 
+        // Track which zones are active this frame
+        const frameActiveZones = new Set<string>();
+
+        // ----- Draw hit zones (background layer) -----
+        for (const zone of HAND_HIT_ZONES) {
+            const isActive = activeZonesRef.current.has(zone.id);
+            drawHitZone(ctx, zone, canvas.width, canvas.height, isActive);
+        }
+
+        // ----- Process landmarks -----
         if (results.landmarks && results.landmarks.length > 0) {
-            const poses = results.landmarks[0]; // Get the first person
+            const poses = results.landmarks[0];
+            const mirrorX = (x: number) => canvas.width - x * canvas.width;
 
-            // We need to mirror the coordinates because our webcam feed is mirrored visually
-            const mirrorX = (x: number) => canvas.width - (x * canvas.width);
+            // Process each wrist
+            const wrists = [
+                { index: TARGET_JOINTS.leftWrist, color: "#ff6b6b" },
+                { index: TARGET_JOINTS.rightWrist, color: "#51cf66" },
+            ];
 
-            // Helper to draw a joint
-            const drawJoint = (index: number, color: string) => {
-                const landmark = poses[index];
-                // If presence or visibility is too low, don't draw
-                if (landmark.presence < 0.5 || landmark.visibility < 0.5) return;
+            for (const wrist of wrists) {
+                const landmark = poses[wrist.index];
+                if (!landmark || landmark.visibility < 0.5) continue;
 
+                // Raw normalized coords (un-mirrored) for collision detection
+                const normX = landmark.x;
+                const normY = landmark.y;
+
+                // Check if wrist is in a hit zone
+                const hitZone = findActiveZone(normX, normY, HAND_HIT_ZONES);
+                const isInZone = hitZone !== null;
+
+                if (hitZone) {
+                    frameActiveZones.add(hitZone.id);
+                    playZone(hitZone.id); // Hook handles cooldown
+                }
+
+                // Draw the wrist dot (mirrored for display)
+                const displayX = mirrorX(normX);
+                const displayY = normY * canvas.height;
+                drawWristDot(ctx, displayX, displayY, wrist.color, isInZone);
+            }
+
+            // Draw ankle dots (visual only for now, no audio)
+            const ankles = [
+                { index: TARGET_JOINTS.leftAnkle, color: "#339af0" },
+                { index: TARGET_JOINTS.rightAnkle, color: "#fcc419" },
+            ];
+
+            for (const ankle of ankles) {
+                const landmark = poses[ankle.index];
+                if (!landmark || landmark.visibility < 0.5) continue;
                 const x = mirrorX(landmark.x);
                 const y = landmark.y * canvas.height;
-
-                ctx.beginPath();
-                ctx.arc(x, y, 10, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            };
-
-            // Draw the target joints in different colors
-            drawJoint(TARGET_JOINTS.leftWrist, "#ff0000"); // Red
-            drawJoint(TARGET_JOINTS.rightWrist, "#00ff00"); // Green
-            drawJoint(TARGET_JOINTS.leftAnkle, "#0000ff"); // Blue
-            drawJoint(TARGET_JOINTS.rightAnkle, "#ffff00"); // Yellow
+                drawWristDot(ctx, x, y, ankle.color, false);
+            }
         }
+
+        // Update active zones for next frame's rendering
+        activeZonesRef.current = frameActiveZones;
 
         requestRef.current = requestAnimationFrame(renderLoop);
     };
 
     // Start the loop when playing state changes
     useEffect(() => {
-        if (isPlaying) {
+        if (isPlaying && isModelLoaded) {
             requestRef.current = requestAnimationFrame(renderLoop);
         } else if (requestRef.current) {
             cancelAnimationFrame(requestRef.current);
@@ -145,10 +273,11 @@ export default function PoseTracker() {
                 cancelAnimationFrame(requestRef.current);
             }
         };
-    }, [isPlaying, isModelLoaded]);
+    }, [isPlaying, isModelLoaded, isAudioReady]);
 
     return (
         <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden bg-black aspect-video shadow-2xl">
+            {/* Loading overlay */}
             {!isModelLoaded && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-white z-20">
                     <Loader2 className="w-10 h-10 animate-spin mb-4 text-purple-500" />
@@ -156,11 +285,29 @@ export default function PoseTracker() {
                 </div>
             )}
 
+            {/* Start button — shows after model loads but before playing */}
+            {isModelLoaded && !isPlaying && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 z-20">
+                    <button
+                        onClick={handleStart}
+                        className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white text-xl font-bold shadow-lg hover:shadow-purple-500/50 hover:scale-105 transition-all duration-200 cursor-pointer"
+                    >
+                        <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                        Start Session
+                    </button>
+                    <p className="text-gray-400 text-sm mt-4">
+                        Click to enable audio &amp; start tracking
+                    </p>
+                </div>
+            )}
+
             <Webcam
                 ref={webcamRef}
-                mirrored={true} // Essential for motion/rhythm games so movement feels natural
+                mirrored={true}
                 className="absolute inset-0 w-full h-full object-cover"
-                onUserMedia={() => setIsPlaying(true)}
+                onUserMedia={() => {
+                    // Webcam is ready, but we wait for the Start button before playing
+                }}
             />
 
             <canvas
@@ -168,9 +315,17 @@ export default function PoseTracker() {
                 className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
             />
 
-            {/* HUD overlay for debugging stats */}
+            {/* HUD overlay */}
             <div className="absolute top-4 left-4 z-20 bg-black/50 p-2 text-white rounded text-xs font-mono">
-                {isModelLoaded ? <span className="text-green-400">Model Ready • Tracking Active</span> : <span className="text-yellow-400">Loading Model...</span>}
+                {isPlaying ? (
+                    <span className="text-green-400">
+                        Model Ready • Tracking Active {isAudioReady ? "• Audio ♪" : ""}
+                    </span>
+                ) : isModelLoaded ? (
+                    <span className="text-yellow-400">Model Ready • Press Start</span>
+                ) : (
+                    <span className="text-yellow-400">Loading Model...</span>
+                )}
             </div>
         </div>
     );
