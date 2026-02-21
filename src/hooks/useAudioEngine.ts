@@ -1,23 +1,18 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { initAudio, triggerNote, disposeAudio } from "@/lib/audioEngine";
+import { initAudio, triggerNote, disposeAudio, isAudioReady } from "@/lib/audioEngine";
 import { HAND_HIT_ZONES } from "@/lib/hitZones";
 
 // No time-based cooldown; notes trigger ONCE upon entering a zone
 
 export function useAudioEngine() {
-    const [isReady, setIsReady] = useState(false);
-
-    // Removed time-based cooldown map, tracked physically in PoseTracker
-
     /**
      * Start the Tone.js AudioContext. Must be called from a user gesture.
      */
     const startAudio = useCallback(async () => {
         try {
             await initAudio();
-            setIsReady(true);
         } catch (err) {
             console.error("[useAudioEngine] Failed to start audio:", err);
         }
@@ -28,22 +23,21 @@ export function useAudioEngine() {
      * Returns true if the note was successfully triggered.
      */
     const playZone = useCallback((zoneId: string): boolean => {
-        if (!isReady) return false;
+        if (!isAudioReady()) return false;
 
         const zone = HAND_HIT_ZONES.find((z) => z.id === zoneId);
         if (!zone) return false;
 
         triggerNote(zone.note);
         return true;
-    }, [isReady]);
+    }, []);
 
     /**
      * Cleanup — call in useEffect unmount
      */
     const cleanup = useCallback(() => {
         disposeAudio();
-        setIsReady(false);
     }, []);
 
-    return { isReady, startAudio, playZone, cleanup };
+    return { startAudio, playZone, cleanup };
 }

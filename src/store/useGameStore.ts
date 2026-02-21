@@ -18,6 +18,8 @@ interface GameStore {
     // Active State
     gameState: GameState;
     setGameState: (state: GameState) => void;
+    isModelLoaded: boolean;
+    setIsModelLoaded: (loaded: boolean) => void;
     currentPlayer: 1 | 2;
     setCurrentPlayer: (player: 1 | 2) => void;
 
@@ -54,6 +56,9 @@ export const useGameStore = create<GameStore>((set) => ({
 
     gameState: 'IDLE',
     setGameState: (state) => set({ gameState: state }),
+
+    isModelLoaded: false,
+    setIsModelLoaded: (loaded) => set({ isModelLoaded: loaded }),
 
     currentPlayer: 1,
     setCurrentPlayer: (player) => set({ currentPlayer: player }),

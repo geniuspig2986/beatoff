@@ -3,12 +3,14 @@
 import React, { useEffect } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { Loader2 } from 'lucide-react';
+import { initAudio } from '@/lib/audioEngine';
 
 const GAME_LENGTH_SECONDS = 15; // Set to 15s for testing, change to 60 for prod
 
 export default function GameUI() {
     const {
         gameState, setGameState,
+        isModelLoaded,
         gameMode, setGameMode,
         currentPlayer, setCurrentPlayer,
         timeLeft, setTimeLeft, decrementTime,
@@ -48,7 +50,8 @@ export default function GameUI() {
         return () => clearInterval(timerId);
     }, [gameState, timeLeft, gameMode, currentPlayer]);
 
-    const startGame = (mode: 'SINGLE' | 'COOP') => {
+    const startGame = async (mode: 'SINGLE' | 'COOP') => {
+        await initAudio();
         resetGame();
         setGameMode(mode);
         setGameState('GET_READY');
@@ -128,7 +131,15 @@ export default function GameUI() {
             {/* Center Screen Overlays */}
             <div className="flex-grow flex items-center justify-center pointer-events-auto">
 
-                {gameState === 'IDLE' && (
+                {gameState === 'IDLE' && !isModelLoaded && (
+                    <div className="flex flex-col items-center justify-center bg-gray-900/90 p-8 rounded-2xl border-2 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.4)] backdrop-blur-md">
+                        <Loader2 className="w-16 h-16 animate-spin mb-4 text-purple-500" />
+                        <h2 className="text-2xl font-bold text-white mb-2 animate-pulse">Loading AI Pose Model</h2>
+                        <p className="text-purple-300 text-sm">Warming up the neural engines...</p>
+                    </div>
+                )}
+
+                {gameState === 'IDLE' && isModelLoaded && (
                     <div className="flex gap-4">
                         <button
                             onClick={() => startGame('SINGLE')}

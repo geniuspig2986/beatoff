@@ -3,9 +3,9 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
-import { Loader2, Play } from "lucide-react";
 import { HAND_HIT_ZONES, findActiveZone, HitZone } from "@/lib/hitZones";
 import { useAudioEngine } from "@/hooks/useAudioEngine";
+import { useGameStore } from "@/store/useGameStore";
 
 // The indices for the joints we care about in the MediaPipe topology
 const TARGET_JOINTS = {
@@ -19,15 +19,14 @@ export default function PoseTracker() {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const [isModelLoaded, setIsModelLoaded] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const { isModelLoaded, setIsModelLoaded } = useGameStore();
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
     // Track which zones are currently active for visual feedback
     const activeZonesRef = useRef<Set<string>>(new Set());
 
     // Audio engine
-    const { isReady: isAudioReady, startAudio, playZone, cleanup: cleanupAudio } = useAudioEngine();
+    const { playZone, cleanup: cleanupAudio } = useAudioEngine();
     const requestRef = useRef<number>(undefined);
 
     // Initialize MediaPipe PoseLandmarker
@@ -71,12 +70,6 @@ export default function PoseTracker() {
             cleanupAudio();
         };
     }, []);
-
-    // Handle start button — unlocks audio and starts tracking
-    const handleStart = useCallback(async () => {
-        await startAudio();
-        setIsPlaying(true);
-    }, [startAudio]);
 
     // ----- Drawing Helpers -----
 
@@ -168,13 +161,15 @@ export default function PoseTracker() {
     // ----- Main Render Loop -----
 
     const renderLoop = () => {
+        if (!isModelLoaded) return;
+
         if (
-            !isPlaying ||
             !poseLandmarkerRef.current ||
             !webcamRef.current ||
             !webcamRef.current.video ||
             !canvasRef.current
         ) {
+            requestRef.current = requestAnimationFrame(renderLoop);
             return;
         }
 
@@ -246,6 +241,10 @@ export default function PoseTracker() {
                 const displayX = mirrorX(normX);
                 const displayY = normY * canvas.height;
                 drawWristDot(ctx, displayX, displayY, color, isInZone);
+            };
+
+            for (const wrist of wrists) {
+                drawJoint(wrist.index, wrist.color);
             }
 
             // Draw ankle dots (visual only for now, no audio)
@@ -271,7 +270,7 @@ export default function PoseTracker() {
 
     // Start the loop when playing state changes
     useEffect(() => {
-        if (isPlaying && isModelLoaded) {
+        if (isModelLoaded) {
             requestRef.current = requestAnimationFrame(renderLoop);
         } else if (requestRef.current) {
             cancelAnimationFrame(requestRef.current);
@@ -282,40 +281,16 @@ export default function PoseTracker() {
                 cancelAnimationFrame(requestRef.current);
             }
         };
-    }, [isPlaying, isModelLoaded, isAudioReady]);
+    }, [isModelLoaded]);
 
     return (
         <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden bg-black aspect-video shadow-2xl">
-            {/* Loading overlay */}
-            {!isModelLoaded && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-white z-20">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-purple-500" />
-                    <p className="animate-pulse">Loading AI Pose Model...</p>
-                </div>
-            )}
-
-            {/* Start button — shows after model loads but before playing */}
-            {isModelLoaded && !isPlaying && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 z-20">
-                    <button
-                        onClick={handleStart}
-                        className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white text-xl font-bold shadow-lg hover:shadow-purple-500/50 hover:scale-105 transition-all duration-200 cursor-pointer"
-                    >
-                        <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                        Start Session
-                    </button>
-                    <p className="text-gray-400 text-sm mt-4">
-                        Click to enable audio &amp; start tracking
-                    </p>
-                </div>
-            )}
-
             <Webcam
                 ref={webcamRef}
                 mirrored={true}
                 className="absolute inset-0 w-full h-full object-cover"
                 onUserMedia={() => {
-                    // Webcam is ready, but we wait for the Start button before playing
+                    // Webcam is ready
                 }}
             />
 
@@ -323,19 +298,6 @@ export default function PoseTracker() {
                 ref={canvasRef}
                 className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
             />
-
-            {/* HUD overlay */}
-            <div className="absolute top-4 left-4 z-20 bg-black/50 p-2 text-white rounded text-xs font-mono">
-                {isPlaying ? (
-                    <span className="text-green-400">
-                        Model Ready • Tracking Active {isAudioReady ? "• Audio ♪" : ""}
-                    </span>
-                ) : isModelLoaded ? (
-                    <span className="text-yellow-400">Model Ready • Press Start</span>
-                ) : (
-                    <span className="text-yellow-400">Loading Model...</span>
-                )}
-            </div>
         </div>
     );
 }
