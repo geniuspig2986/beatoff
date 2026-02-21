@@ -22,13 +22,13 @@ export default function PoseTracker() {
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
-    const requestRef = useRef<number | undefined>(undefined);
 
     // Track which zones are currently active for visual feedback
     const activeZonesRef = useRef<Set<string>>(new Set());
 
     // Audio engine
     const { isReady: isAudioReady, startAudio, playZone, cleanup: cleanupAudio } = useAudioEngine();
+    const requestRef = useRef<number>(undefined);
 
     // Initialize MediaPipe PoseLandmarker
     useEffect(() => {
@@ -220,9 +220,11 @@ export default function PoseTracker() {
                 { index: TARGET_JOINTS.rightWrist, color: "#51cf66" },
             ];
 
-            for (const wrist of wrists) {
-                const landmark = poses[wrist.index];
-                if (!landmark || landmark.visibility < 0.5) continue;
+            // Helper to draw a joint
+            const drawJoint = (index: number, color: string) => {
+                const landmark = poses[index];
+                // If visibility is too low, don't draw
+                if (landmark.visibility < 0.5) return;
 
                 // Raw normalized coords (un-mirrored) for collision detection
                 const normX = landmark.x;
@@ -243,7 +245,7 @@ export default function PoseTracker() {
                 // Draw the wrist dot (mirrored for display)
                 const displayX = mirrorX(normX);
                 const displayY = normY * canvas.height;
-                drawWristDot(ctx, displayX, displayY, wrist.color, isInZone);
+                drawWristDot(ctx, displayX, displayY, color, isInZone);
             }
 
             // Draw ankle dots (visual only for now, no audio)
