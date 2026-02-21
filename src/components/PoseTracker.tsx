@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
-import { Loader2 } from "lucide-react";
+import { HAND_HIT_ZONES, findActiveZone, HitZone } from "@/lib/hitZones";
+import { useAudioEngine } from "@/hooks/useAudioEngine";
+import { useGameStore } from "@/store/useGameStore";
 
 // The indices for the joints we care about in the MediaPipe topology
 const TARGET_JOINTS = {
@@ -17,9 +19,14 @@ export default function PoseTracker() {
     const webcamRef = useRef<Webcam>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const [isModelLoaded, setIsModelLoaded] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const { isModelLoaded, setIsModelLoaded } = useGameStore();
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+
+    // Track which zones are currently active for visual feedback
+    const activeZonesRef = useRef<Set<string>>(new Set());
+
+    // Audio engine
+    const { playZone, cleanup: cleanupAudio } = useAudioEngine();
     const requestRef = useRef<number>(undefined);
 
     // Initialize MediaPipe PoseLandmarker
@@ -34,12 +41,11 @@ export default function PoseTracker() {
 
                 const landmarker = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        // We downloaded this file into the public directory
                         modelAssetPath: "/pose_landmarker_lite.task",
                         delegate: "GPU",
                     },
                     runningMode: "VIDEO",
-                    numPoses: 1, // Only tracking one person for now
+                    numPoses: 1,
                 });
 
                 if (active) {
@@ -61,18 +67,109 @@ export default function PoseTracker() {
             if (requestRef.current) {
                 cancelAnimationFrame(requestRef.current);
             }
+            cleanupAudio();
         };
     }, []);
 
-    // Tracking Loop
+    // ----- Drawing Helpers -----
+
+    const drawHitZone = (
+        ctx: CanvasRenderingContext2D,
+        zone: HitZone,
+        canvasW: number,
+        canvasH: number,
+        isActive: boolean
+    ) => {
+        // Mirror X for display (webcam is mirrored)
+        const cx = canvasW - zone.x * canvasW;
+        const cy = zone.y * canvasH;
+
+        // Scale size to keep it square on screen
+        const s = zone.size * Math.max(canvasW, canvasH);
+        const minX = cx - s / 2;
+        const minY = cy - s / 2;
+
+        ctx.save();
+
+        if (isActive) {
+            // Glow effect when hit
+            ctx.shadowColor = zone.glowColor;
+            ctx.shadowBlur = 30;
+
+            // Bright filled square
+            ctx.beginPath();
+            ctx.roundRect(minX, minY, s, s, 10);
+            ctx.fillStyle = zone.glowColor;
+            ctx.fill();
+
+            // Inner bright square ring
+            ctx.beginPath();
+            ctx.roundRect(minX + s * 0.2, minY + s * 0.2, s * 0.6, s * 0.6, 6);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        } else {
+            // Idle state — semi-transparent square
+            ctx.beginPath();
+            ctx.roundRect(minX, minY, s, s, 10);
+            ctx.fillStyle = zone.color;
+            ctx.fill();
+
+            // Border square
+            ctx.beginPath();
+            ctx.roundRect(minX, minY, s, s, 10);
+            ctx.strokeStyle = zone.glowColor.replace("0.9", "0.6");
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Note label
+        ctx.shadowBlur = 0;
+        ctx.font = `bold ${Math.max(14, s * 0.3)}px monospace`;
+        ctx.fillStyle = isActive ? "#fff" : "rgba(255, 255, 255, 0.7)";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(zone.label, cx, cy);
+
+        ctx.restore();
+    };
+
+    const drawWristDot = (
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        color: string,
+        isInZone: boolean
+    ) => {
+        const dotRadius = isInZone ? 14 : 8;
+
+        ctx.save();
+        if (isInZone) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
+        }
+        ctx.beginPath();
+        ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    };
+
+    // ----- Main Render Loop -----
+
     const renderLoop = () => {
+        if (!isModelLoaded) return;
+
         if (
-            !isPlaying ||
             !poseLandmarkerRef.current ||
             !webcamRef.current ||
             !webcamRef.current.video ||
             !canvasRef.current
         ) {
+            requestRef.current = requestAnimationFrame(renderLoop);
             return;
         }
 
@@ -91,18 +188,32 @@ export default function PoseTracker() {
             canvas.height = video.videoHeight;
         }
 
-        // Clear previous frame drawn
+        // Clear previous frame
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Get the pose estimation
         const startTimeMs = performance.now();
         const results = poseLandmarkerRef.current.detectForVideo(video, startTimeMs);
 
-        if (results.landmarks && results.landmarks.length > 0) {
-            const poses = results.landmarks[0]; // Get the first person
+        // Track which zones are active this frame
+        const frameActiveZones = new Set<string>();
 
-            // We need to mirror the coordinates because our webcam feed is mirrored visually
-            const mirrorX = (x: number) => canvas.width - (x * canvas.width);
+        // ----- Draw hit zones (background layer) -----
+        for (const zone of HAND_HIT_ZONES) {
+            const isActive = activeZonesRef.current.has(zone.id);
+            drawHitZone(ctx, zone, canvas.width, canvas.height, isActive);
+        }
+
+        // ----- Process landmarks -----
+        if (results.landmarks && results.landmarks.length > 0) {
+            const poses = results.landmarks[0];
+            const mirrorX = (x: number) => canvas.width - x * canvas.width;
+
+            // Process each wrist
+            const wrists = [
+                { index: TARGET_JOINTS.leftWrist, color: "#ff6b6b" },
+                { index: TARGET_JOINTS.rightWrist, color: "#51cf66" },
+            ];
 
             // Helper to draw a joint
             const drawJoint = (index: number, color: string) => {
@@ -110,31 +221,56 @@ export default function PoseTracker() {
                 // If visibility is too low, don't draw
                 if (landmark.visibility < 0.5) return;
 
-                const x = mirrorX(landmark.x);
-                const y = landmark.y * canvas.height;
+                // Raw normalized coords (un-mirrored) for collision detection
+                const normX = landmark.x;
+                const normY = landmark.y;
 
-                ctx.beginPath();
-                ctx.arc(x, y, 10, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                // Check if wrist is in a hit zone
+                const hitZone = findActiveZone(normX, normY, HAND_HIT_ZONES);
+                const isInZone = hitZone !== null;
+
+                if (hitZone) {
+                    frameActiveZones.add(hitZone.id);
+                    // Only play if it wasn't already active last frame (infinite cooldown)
+                    if (!activeZonesRef.current.has(hitZone.id)) {
+                        playZone(hitZone.id);
+                    }
+                }
+
+                // Draw the wrist dot (mirrored for display)
+                const displayX = mirrorX(normX);
+                const displayY = normY * canvas.height;
+                drawWristDot(ctx, displayX, displayY, color, isInZone);
             };
 
-            // Draw the target joints in different colors
-            drawJoint(TARGET_JOINTS.leftWrist, "#ff0000"); // Red
-            drawJoint(TARGET_JOINTS.rightWrist, "#00ff00"); // Green
-            drawJoint(TARGET_JOINTS.leftAnkle, "#0000ff"); // Blue
-            drawJoint(TARGET_JOINTS.rightAnkle, "#ffff00"); // Yellow
+            for (const wrist of wrists) {
+                drawJoint(wrist.index, wrist.color);
+            }
+
+            // Draw ankle dots (visual only for now, no audio)
+            const ankles = [
+                { index: TARGET_JOINTS.leftAnkle, color: "#339af0" },
+                { index: TARGET_JOINTS.rightAnkle, color: "#fcc419" },
+            ];
+
+            for (const ankle of ankles) {
+                const landmark = poses[ankle.index];
+                if (!landmark || landmark.visibility < 0.5) continue;
+                const x = mirrorX(landmark.x);
+                const y = landmark.y * canvas.height;
+                drawWristDot(ctx, x, y, ankle.color, false);
+            }
         }
+
+        // Update active zones for next frame's rendering
+        activeZonesRef.current = frameActiveZones;
 
         requestRef.current = requestAnimationFrame(renderLoop);
     };
 
     // Start the loop when playing state changes
     useEffect(() => {
-        if (isPlaying) {
+        if (isModelLoaded) {
             requestRef.current = requestAnimationFrame(renderLoop);
         } else if (requestRef.current) {
             cancelAnimationFrame(requestRef.current);
@@ -145,33 +281,23 @@ export default function PoseTracker() {
                 cancelAnimationFrame(requestRef.current);
             }
         };
-    }, [isPlaying, isModelLoaded]);
+    }, [isModelLoaded]);
 
     return (
         <div className="relative w-full max-w-4xl mx-auto rounded-xl overflow-hidden bg-black aspect-video shadow-2xl">
-            {!isModelLoaded && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-white z-20">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4 text-purple-500" />
-                    <p className="animate-pulse">Loading AI Pose Model...</p>
-                </div>
-            )}
-
             <Webcam
                 ref={webcamRef}
-                mirrored={true} // Essential for motion/rhythm games so movement feels natural
+                mirrored={true}
                 className="absolute inset-0 w-full h-full object-cover"
-                onUserMedia={() => setIsPlaying(true)}
+                onUserMedia={() => {
+                    // Webcam is ready
+                }}
             />
 
             <canvas
                 ref={canvasRef}
                 className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none"
             />
-
-            {/* HUD overlay for debugging stats */}
-            <div className="absolute top-4 left-4 z-20 bg-black/50 p-2 text-white rounded text-xs font-mono">
-                {isModelLoaded ? <span className="text-green-400">Model Ready • Tracking Active</span> : <span className="text-yellow-400">Loading Model...</span>}
-            </div>
         </div>
     );
 }
