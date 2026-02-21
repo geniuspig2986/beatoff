@@ -9,6 +9,8 @@ export type RecordedEvent = {
 
 interface GameStore {
     // Config
+    gameMode: 'SINGLE' | 'COOP';
+    setGameMode: (mode: 'SINGLE' | 'COOP') => void;
     activeTheme: string;
     setActiveTheme: (theme: string) => void;
 
@@ -45,6 +47,8 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set) => ({
+    gameMode: 'COOP',
+    setGameMode: (mode) => set({ gameMode: mode }),
     activeTheme: '8-Bit Boss Battle',
     setActiveTheme: (theme) => set({ activeTheme: theme }),
 

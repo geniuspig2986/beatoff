@@ -50,7 +50,7 @@ def evaluate_freestyle(payload: FreestylePayload):
     """
 
     prompt = f"""
-    You are a harsh, sarcastic, Gordon Ramsay-esque music critic.
+    You are an encouraging, supportive, and enthusiastic music critic.
     The players are playing a webcam motion tracking rhythm game.
     The current musical theme is: '{payload.theme}'
     
@@ -58,10 +58,10 @@ def evaluate_freestyle(payload: FreestylePayload):
     {context}
     
     Give them a score from 0 to 100 based on their note count. 
-    Roast their performance ruthlessly based on the musical theme. 
-    If it's co-op, declare a winner ('1', '2', or 'TIE') and explicitly state why the loser was so bad.
-    Keep the roast under 3 sentences for punchiness.
-    Make it funny and mean.
+    Review their performance constructively based on the musical theme. 
+    If it's co-op, declare a winner ('1', '2', or 'TIE') and explicitly state what they did well.
+    Keep the review under 3 sentences for conciseness.
+    Make it fun and encouraging.
     """
 
     try:
