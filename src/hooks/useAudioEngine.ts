@@ -1,43 +1,61 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { initAudio, triggerNote, disposeAudio, isAudioReady } from "@/lib/audioEngine";
+import { useRef, useCallback } from "react";
+import { initAudio, disposeAudio, isAudioReady } from "@/lib/audioEngine";
 import { HAND_HIT_ZONES } from "@/lib/hitZones";
+import { getSoundEngine, GRIMEY_THEME, type SoundEngine } from "@/lib/soundEngine";
 
-// No time-based cooldown; notes trigger ONCE upon entering a zone
+// Zone ID -> hand index (0-5) for SoundEngine.triggerHand
+const ZONE_ID_TO_INDEX: Record<string, number> = {
+  L0: 0,
+  L1: 1,
+  L2: 2,
+  R0: 3,
+  R1: 4,
+  R2: 5,
+};
 
 export function useAudioEngine() {
-    /**
-     * Start the Tone.js AudioContext. Must be called from a user gesture.
-     */
-    const startAudio = useCallback(async () => {
-        try {
-            await initAudio();
-        } catch (err) {
-            console.error("[useAudioEngine] Failed to start audio:", err);
-        }
-    }, []);
+  const engineRef = useRef<SoundEngine | null>(null);
 
-    /**
-     * Play the note mapped to a zone immediately.
-     * Returns true if the note was successfully triggered.
-     */
-    const playZone = useCallback((zoneId: string): boolean => {
-        if (!isAudioReady()) return false;
+  /**
+   * Start the Tone.js AudioContext. Must be called from a user gesture.
+   */
+  const startAudio = useCallback(async () => {
+    try {
+      await initAudio();
+      engineRef.current = getSoundEngine(GRIMEY_THEME);
+    } catch (err) {
+      console.error("[useAudioEngine] Failed to start audio:", err);
+    }
+  }, []);
 
-        const zone = HAND_HIT_ZONES.find((z) => z.id === zoneId);
-        if (!zone) return false;
+  /**
+   * Play the grimy theme's note for the zone. Returns true if triggered.
+   */
+  const playZone = useCallback((zoneId: string): boolean => {
+    if (!isAudioReady()) return false;
 
-        triggerNote(zone.note);
-        return true;
-    }, []);
+    const index = ZONE_ID_TO_INDEX[zoneId];
+    if (index === undefined || index < 0 || index > 5) return false;
 
-    /**
-     * Cleanup — call in useEffect unmount
-     */
-    const cleanup = useCallback(() => {
-        disposeAudio();
-    }, []);
+    const engine = engineRef.current ?? getSoundEngine(GRIMEY_THEME);
+    engineRef.current = engine;
+    engine.setTheme(GRIMEY_THEME);
+    engine.triggerHand(index);
+    return true;
+  }, []);
 
-    return { startAudio, playZone, cleanup };
+  /**
+   * Cleanup — call in useEffect unmount
+   */
+  const cleanup = useCallback(() => {
+    if (engineRef.current) {
+      engineRef.current.cleanup();
+      engineRef.current = null;
+    }
+    disposeAudio();
+  }, []);
+
+  return { startAudio, playZone, cleanup };
 }

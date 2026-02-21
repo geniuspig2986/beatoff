@@ -25,6 +25,14 @@ export interface GameTheme {
 const globalForSound = globalThis as unknown as {
   __soundEngineTheme?: GameTheme;
   __soundEngineMaster?: { reverb: Tone.Reverb; limiter: Tone.Limiter };
+  __rockThemeDistortion?: Tone.Distortion;
+  __grimyThemeEffects?: {
+    distortion: Tone.Distortion;
+    delay: Tone.FeedbackDelay;
+    chorus: Tone.Chorus;
+    phaser: Tone.Phaser;
+    filter: Tone.Filter;
+  };
 };
 
 function disposeTheme(theme: GameTheme): void {
@@ -34,6 +42,21 @@ function disposeTheme(theme: GameTheme): void {
     theme.footSynths.snare.dispose();
     theme.footSynths.hihat.dispose();
     theme.footSynths.tom.dispose();
+    // Dispose rock theme distortion if it exists
+    if (theme.name === "90s Rock" && globalForSound.__rockThemeDistortion) {
+      globalForSound.__rockThemeDistortion.dispose();
+      globalForSound.__rockThemeDistortion = undefined;
+    }
+    // Dispose grimy theme effects if they exist
+    if (theme.name === "Grimy" && globalForSound.__grimyThemeEffects) {
+      const effects = globalForSound.__grimyThemeEffects;
+      effects.distortion.dispose();
+      effects.delay.dispose();
+      effects.chorus.dispose();
+      effects.phaser.dispose();
+      effects.filter.dispose();
+      globalForSound.__grimyThemeEffects = undefined;
+    }
   } catch {
     // Ignore disposal errors (e.g. already disposed)
   }
@@ -80,7 +103,6 @@ function createPianoJazzTheme(): GameTheme {
 
   // Hand synth: Grand Piano envelope
   const handSynth = new Tone.PolySynth(Tone.Synth, {
-    maxPolyphony: 8,
     envelope: {
       attack: 0.005,
       decay: 1,
@@ -102,7 +124,6 @@ function createPianoJazzTheme(): GameTheme {
   }).connect(reverb);
 
   const hihat = new Tone.MetalSynth({
-    frequency: 200,
     envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
     harmonicity: 5.1,
     modulationIndex: 32,
@@ -128,6 +149,215 @@ function createPianoJazzTheme(): GameTheme {
 }
 
 export const PIANO_JAZZ_THEME = createPianoJazzTheme();
+
+// --- Theme Implementation: 70s Studio Disco ---
+
+function createDiscoStudioTheme(): GameTheme {
+  const { reverb } = getOrCreateMasterBus();
+
+  // Hand synth: brighter, brassy disco lead
+  const handSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sawtooth" },
+    envelope: {
+      attack: 0.01,
+      decay: 0.3,
+      sustain: 0.2,
+      release: 0.4,
+    },
+  }).connect(reverb);
+
+  // Foot synths: heavy 4-on-the-floor kit
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.08,
+    octaves: 5,
+    envelope: { attack: 0.001, decay: 0.5, sustain: 0 },
+  }).connect(reverb);
+
+  const snare = new Tone.NoiseSynth({
+    noise: { type: "white" },
+    envelope: { attack: 0.001, decay: 0.25, sustain: 0 },
+  }).connect(reverb);
+
+  const hihat = new Tone.MetalSynth({
+    envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+    harmonicity: 5.0,
+    modulationIndex: 20,
+    resonance: 6000,
+    octaves: 1.5,
+  }).connect(reverb);
+
+  const tom = new Tone.MembraneSynth({
+    pitchDecay: 0.06,
+    octaves: 4,
+    envelope: { attack: 0.001, decay: 0.4, sustain: 0 },
+  }).connect(reverb);
+
+  const theme: GameTheme = {
+    name: "70s Studio Disco",
+    handSynth,
+    footSynths: { kick, snare, hihat, tom },
+    // F# minor pentatonic-ish: funky mid-register
+    handNotes: ["F#3", "G#3", "A#3", "C#4", "D#4", "F#4"],
+  };
+
+  return theme;
+}
+
+export const DISCO_STUDIO_THEME = createDiscoStudioTheme();
+
+// --- Theme Implementation: 90s Rock ---
+
+function createRockTheme(): GameTheme {
+  const { reverb } = getOrCreateMasterBus();
+
+  // Hand synth: Electric guitar with heavy distortion
+  const distortion = new Tone.Distortion(0.8).connect(reverb);
+  globalForSound.__rockThemeDistortion = distortion;
+  const handSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sawtooth" },
+    envelope: {
+      attack: 0.01,
+      decay: 0.5,
+      sustain: 0.3,
+      release: 0.6,
+    },
+    volume: 0,
+  }).connect(distortion);
+
+  // Foot synths: Heavy rock kit
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.1,
+    octaves: 6,
+    envelope: { attack: 0.001, decay: 0.6, sustain: 0 },
+  }).connect(reverb);
+
+  const snare = new Tone.NoiseSynth({
+    noise: { type: "white" },
+    envelope: { attack: 0.001, decay: 0.15, sustain: 0 },
+  }).connect(reverb);
+
+  const hihat = new Tone.MetalSynth({
+    envelope: { attack: 0.001, decay: 0.08, sustain: 0 },
+    harmonicity: 5.1,
+    modulationIndex: 16,
+    resonance: 3000,
+    octaves: 1.2,
+  }).connect(reverb);
+
+  // Tom configured as crash symbol (higher pitch, longer decay for crash-like sound)
+  const tom = new Tone.MembraneSynth({
+    pitchDecay: 0.05,
+    octaves: 8,
+    envelope: { attack: 0.001, decay: 0.8, sustain: 0 },
+  }).connect(reverb);
+
+  const theme: GameTheme = {
+    name: "90s Rock",
+    handSynth,
+    footSynths: { kick, snare, hihat, tom },
+    // E flat pentatonic: Eb, F, G, Bb, C
+    handNotes: ["Eb3", "F3", "G3", "Bb3", "C4", "Eb4"],
+  };
+
+  return theme;
+}
+
+export const ROCK_THEME = createRockTheme();
+
+// --- Theme Implementation: Grimy ---
+
+function createGrimyTheme(): GameTheme {
+  const { reverb } = getOrCreateMasterBus();
+
+  // Hand synth: Maximum effects chain - distortion -> delay -> chorus -> phaser -> filter -> reverb
+  const distortion = new Tone.Distortion(0.9); // Cranked distortion
+  const delay = new Tone.FeedbackDelay("8n", 0.4); // Heavy delay
+  const chorus = new Tone.Chorus(4, 2.5, 0.5); // Deep chorus
+  const phaser = new Tone.Phaser({
+    frequency: 1.5,
+    octaves: 3,
+    baseFrequency: 350,
+  });
+  const filter = new Tone.Filter({
+    type: "lowpass",
+    frequency: 2000,
+    Q: 5,
+  });
+
+  // Chain: synth -> distortion -> delay -> chorus -> phaser -> filter -> reverb
+  distortion.connect(delay);
+  delay.connect(chorus);
+  chorus.connect(phaser);
+  phaser.connect(filter);
+  filter.connect(reverb);
+
+  // Store effects for disposal
+  globalForSound.__grimyThemeEffects = {
+    distortion,
+    delay,
+    chorus,
+    phaser,
+    filter,
+  };
+
+  // Use a cool synth with sawtooth and lots of harmonics
+  const handSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: "sawtooth" },
+    envelope: {
+      attack: 0.05,
+      decay: 0.3,
+      sustain: 0.4,
+      release: 0.8,
+    },
+    volume: -5,
+  }).connect(distortion);
+
+  // Foot synths: Heavy drums
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.12,
+    octaves: 7,
+    envelope: { attack: 0.001, decay: 0.7, sustain: 0 },
+  }).connect(reverb);
+
+  const snare = new Tone.NoiseSynth({
+    noise: { type: "white" },
+    envelope: { attack: 0.001, decay: 0.3, sustain: 0 },
+  }).connect(reverb);
+
+  const hihat = new Tone.MetalSynth({
+    envelope: { attack: 0.001, decay: 0.1, sustain: 0 },
+    harmonicity: 5.5,
+    modulationIndex: 25,
+    resonance: 5000,
+    octaves: 1.5,
+  }).connect(reverb);
+
+  const tom = new Tone.MembraneSynth({
+    pitchDecay: 0.08,
+    octaves: 5,
+    envelope: { attack: 0.001, decay: 0.5, sustain: 0 },
+  }).connect(reverb);
+
+  const theme: GameTheme = {
+    name: "Grimy",
+    handSynth,
+    footSynths: { kick, snare, hihat, tom },
+    // C pentatonic: C, D, E, G, A
+    handNotes: ["C3", "D3", "E3", "G3", "A3", "C4"],
+  };
+
+  return theme;
+}
+
+export const GRIMEY_THEME = createGrimyTheme();
+
+// --- All Available Themes (for random selection) ---
+export const ALL_THEMES = [
+  PIANO_JAZZ_THEME,
+  DISCO_STUDIO_THEME,
+  ROCK_THEME,
+  GRIMEY_THEME,
+] as const;
 
 // --- SoundEngine Class ---
 
@@ -167,9 +397,11 @@ export class SoundEngine {
     const synth = this.currentTheme.footSynths[key];
 
     if (key === "snare") {
-      synth.triggerAttackRelease("8n");
+      // NoiseSynth: duration + explicit start time
+      (synth as Tone.NoiseSynth).triggerAttackRelease(0.2, 0);
     } else if (key === "hihat") {
-      synth.triggerAttackRelease("32n");
+      // MetalSynth: short metallic tick
+      (synth as Tone.MetalSynth).triggerAttackRelease(0.05, 0);
     } else {
       const pitch = FOOT_PITCHES[key] ?? "C2";
       synth.triggerAttackRelease(pitch, "8n");

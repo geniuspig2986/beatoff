@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { Loader2 } from 'lucide-react';
 import { initAudio } from '@/lib/audioEngine';
+import { ALL_THEMES } from '@/lib/soundEngine';
 
 const GAME_LENGTH_SECONDS = 15; // Set to 15s for testing, change to 60 for prod
 
@@ -47,6 +48,10 @@ export default function GameUI() {
 
     const startGame = async () => {
         await initAudio();
+        
+        // Use Grimy theme
+        setActiveTheme('Grimy');
+        
         resetGame();
         setGameState('GET_READY');
         setTimeLeft(GAME_LENGTH_SECONDS); // Using 15s for testing, 60s for actual game
