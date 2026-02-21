@@ -86,18 +86,33 @@ export default function GameUI() {
                 player2Sequence: player2Sequence
             };
 
-            // Note: URL hardcoded to typical FastAPI uvicorn start port for local demo
-            const response = await fetch("http://localhost:8000/api/judge/freestyle", {
+            // Use local Next.js API route which will proxy to the Python backend when configured,
+            // otherwise returns a mock response for demo/dev (per stack constraints).
+            const response = await fetch("/api/judge/freestyle", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error("Failed backend request");
+            let data: any = null;
+            if (!response.ok) {
+                // Read backend error body for debugging and fail gracefully with mock
+                const text = await response.text().catch(() => "(no body)");
+                console.error("Judge API returned non-OK:", response.status, text);
 
-            const data = await response.json();
+                // Fallback mock response so UI continues (demo-friendly)
+                data = {
+                    roast: "The Backend API returned an error; showing mock results for now.",
+                    scoreP1: 84,
+                    scoreP2: 41,
+                    winner: '1',
+                    audioUrl: ''
+                };
+            } else {
+                data = await response.json();
+            }
 
-            // Mock data logic assumes the backend passes back {roast, scoreP1, scoreP2, audioUrl}
+            // Apply judge feedback (real or mock)
             setJudgeFeedback(data);
             // MOCK: wait a short tick to let MediaRecorder finish generating the blob
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -115,7 +130,7 @@ export default function GameUI() {
                     formData.append("score", String(data.scoreP1)); // or aggregate
                     formData.append("roast", data.roast);
 
-                    const tweetResponse = await fetch("http://localhost:8000/api/social/twitter", {
+                    const tweetResponse = await fetch("/api/social/twitter", {
                         method: "POST",
                         body: formData
                     });

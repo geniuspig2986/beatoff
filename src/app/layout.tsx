@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Black_Ops_One, Barlow_Condensed, Barlow } from "next/font/google";
 import "./globals.css";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,6 +46,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${blackOpsOne.variable} ${barlowCondensed.variable} ${barlow.variable} antialiased`}
       >
+        <header style={{ position: "fixed", top: 12, right: 12, zIndex: 60 }}>
+          <Link href="/endingpage" className="px-3 py-2 rounded-md bg-violet-700/80 text-white text-sm font-[var(--font-barlow-condensed)]">Results</Link>
+        </header>
         {children}
       </body>
     </html>
