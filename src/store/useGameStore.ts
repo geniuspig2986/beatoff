@@ -14,6 +14,12 @@ interface GameStore {
     activeTheme: string;
     setActiveTheme: (theme: string) => void;
 
+    // Twitter Integration
+    twitterPermission: boolean | null;
+    setTwitterPermission: (permission: boolean | null) => void;
+    recordedVideoBlob: Blob | null;
+    setRecordedVideoBlob: (blob: Blob | null) => void;
+
     // Active State
     gameState: GameState;
     setGameState: (state: GameState) => void;
@@ -49,8 +55,14 @@ interface GameStore {
 export const useGameStore = create<GameStore>((set) => ({
     gameMode: 'COOP',
     setGameMode: (mode) => set({ gameMode: mode }),
-    activeTheme: '8-Bit Boss Battle',
+    activeTheme: 'Ragtime Ruckus',
     setActiveTheme: (theme) => set({ activeTheme: theme }),
+
+    twitterPermission: null,
+    setTwitterPermission: (permission) => set({ twitterPermission: permission }),
+
+    recordedVideoBlob: null,
+    setRecordedVideoBlob: (blob) => set({ recordedVideoBlob: blob }),
 
     gameState: 'IDLE',
     setGameState: (state) => set({ gameState: state }),
@@ -85,6 +97,8 @@ export const useGameStore = create<GameStore>((set) => ({
         timeLeft: 60,
         player1Sequence: [],
         player2Sequence: [],
-        judgeFeedback: null
+        judgeFeedback: null,
+        twitterPermission: null,
+        recordedVideoBlob: null,
     }),
 }));

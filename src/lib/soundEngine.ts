@@ -80,7 +80,6 @@ function createPianoJazzTheme(): GameTheme {
 
   // Hand synth: Grand Piano envelope
   const handSynth = new Tone.PolySynth(Tone.Synth, {
-    maxPolyphony: 8,
     envelope: {
       attack: 0.005,
       decay: 1,
@@ -88,6 +87,7 @@ function createPianoJazzTheme(): GameTheme {
       release: 1,
     },
   }).connect(reverb);
+  handSynth.maxPolyphony = 8;
 
   // Foot synths
   const kick = new Tone.MembraneSynth({
@@ -102,7 +102,6 @@ function createPianoJazzTheme(): GameTheme {
   }).connect(reverb);
 
   const hihat = new Tone.MetalSynth({
-    frequency: 200,
     envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
     harmonicity: 5.1,
     modulationIndex: 32,
@@ -164,15 +163,17 @@ export class SoundEngine {
     if (index < 0 || index > 3) return;
 
     const key = FOOT_KEYS[index];
-    const synth = this.currentTheme.footSynths[key];
 
     if (key === "snare") {
-      synth.triggerAttackRelease("8n");
+      this.currentTheme.footSynths.snare.triggerAttackRelease("8n");
     } else if (key === "hihat") {
-      synth.triggerAttackRelease("32n");
-    } else {
-      const pitch = FOOT_PITCHES[key] ?? "C2";
-      synth.triggerAttackRelease(pitch, "8n");
+      this.currentTheme.footSynths.hihat.triggerAttackRelease(200, "32n");
+    } else if (key === "kick") {
+      const pitch = FOOT_PITCHES.kick ?? "C1";
+      this.currentTheme.footSynths.kick.triggerAttackRelease(pitch, "8n");
+    } else if (key === "tom") {
+      const pitch = FOOT_PITCHES.tom ?? "C3";
+      this.currentTheme.footSynths.tom.triggerAttackRelease(pitch, "8n");
     }
   }
 

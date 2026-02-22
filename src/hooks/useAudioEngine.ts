@@ -42,6 +42,17 @@ export function useAudioEngine() {
         return false;
     }, []);
 
+    const getAudioStream = useCallback(() => {
+        const dest = getAudioDestination();
+        if (dest && dest.context) {
+            // Create a media stream destination
+            const mediaStreamDest = dest.context.createMediaStreamDestination();
+            dest.connect(mediaStreamDest);
+            return mediaStreamDest.stream;
+        }
+        return null;
+    }, []);
+
     /**
      * Cleanup — call in useEffect unmount
      */
@@ -49,5 +60,5 @@ export function useAudioEngine() {
         disposeAudio();
     }, []);
 
-    return { startAudio, playZone, cleanup };
+    return { startAudio, playZone, getAudioStream, cleanup };
 }

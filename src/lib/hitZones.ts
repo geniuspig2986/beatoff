@@ -43,7 +43,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "D4",
         x: 0.72,
         y: 0.45,
-        size: 0.14,
+        size: 0.10,
         note: "D4",
         color: "rgba(139, 92, 246, 0.4)",   // Indigo
         glowColor: "rgba(139, 92, 246, 0.9)",
@@ -74,7 +74,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
         label: "A4",
         x: 0.28,
         y: 0.45,
-        size: 0.14,
+        size: 0.10,
         note: "A4",
         color: "rgba(244, 63, 94, 0.4)",    // Rose
         glowColor: "rgba(244, 63, 94, 0.9)",

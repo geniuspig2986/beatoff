@@ -46,11 +46,6 @@ export async function initAudio(): Promise<void> {
   console.log("[AudioEngine] Tone.js started, synths ready.");
 }
 
-/**
- * Trigger a note on the shared PolySynth.
- * @param note - e.g. "C4", "D4"
- * @param duration - Tone.js duration string, default "8n" (eighth note)
- */
 export function triggerNote(note: string, duration: string = "8n"): void {
   if (!isInitialized) {
     console.warn("[AudioEngine] Audio not initialized. Call initAudio() first.");
@@ -77,7 +72,15 @@ export function isAudioReady(): boolean {
 }
 
 /**
- * Cleanup: dispose the synth. Call on unmount.
+ * Get Tone destination to hook into a MediaRecorder
+ */
+export function getAudioDestination(): Tone.ToneAudioNode | null {
+  if (!isInitialized) return null;
+  return Tone.getDestination();
+}
+
+/**
+ * Cleanup: dispose the synths. Call on unmount.
  */
 export function disposeAudio(): void {
   if (synth) {
