@@ -54,7 +54,11 @@ export function triggerNote(note: string, duration: string = "8n"): void {
 
   // Check if the note is one of our mapped drum hits
   if (["C2", "D2", "E2", "F2"].includes(note) && drumSampler) {
-    drumSampler.triggerAttackRelease(note, duration);
+    if (drumSampler.loaded) {
+      drumSampler.triggerAttackRelease(note, duration);
+    } else {
+      console.warn("[AudioEngine] Drum sampler not loaded yet.");
+    }
   } else if (synth) {
     synth.triggerAttackRelease(note, duration);
   }
