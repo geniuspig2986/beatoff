@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { initAudio, triggerNote, disposeAudio, isAudioReady } from "@/lib/audioEngine";
-import { HAND_HIT_ZONES } from "@/lib/hitZones";
+import { HAND_HIT_ZONES, KICK_ZONES } from "@/lib/hitZones";
 
 // No time-based cooldown; notes trigger ONCE upon entering a zone
 
@@ -25,11 +25,21 @@ export function useAudioEngine() {
     const playZone = useCallback((zoneId: string): boolean => {
         if (!isAudioReady()) return false;
 
-        const zone = HAND_HIT_ZONES.find((z) => z.id === zoneId);
-        if (!zone) return false;
+        // Try hand zones first
+        const handZone = HAND_HIT_ZONES.find((z) => z.id === zoneId);
+        if (handZone) {
+            triggerNote(handZone.note);
+            return true;
+        }
 
-        triggerNote(zone.note);
-        return true;
+        // Try kick mapping
+        const kickNote = KICK_ZONES[zoneId];
+        if (kickNote) {
+            triggerNote(kickNote);
+            return true;
+        }
+
+        return false;
     }, []);
 
     /**

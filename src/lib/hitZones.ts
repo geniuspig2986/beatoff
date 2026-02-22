@@ -27,11 +27,11 @@ export interface HitZone {
 // C major pentatonic: C4, D4, E4, G4, A4, C5
 // Left zones = lower notes, Right zones = higher notes
 export const HAND_HIT_ZONES: HitZone[] = [
-    // Left side (MediaPipe right, since un-mirrored) — positioned at ~75% X
+    // Left side (MediaPipe right, since un-mirrored) — slightly wider
     {
         id: "L0",
         label: "C4",
-        x: 0.78,
+        x: 0.72,
         y: 0.22,
         size: 0.14,
         note: "C4",
@@ -41,7 +41,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "L1",
         label: "D4",
-        x: 0.78,
+        x: 0.72,
         y: 0.45,
         size: 0.14,
         note: "D4",
@@ -51,18 +51,18 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "L2",
         label: "E4",
-        x: 0.78,
+        x: 0.72,
         y: 0.68,
         size: 0.14,
         note: "E4",
         color: "rgba(99, 102, 241, 0.4)",   // Blue-indigo
         glowColor: "rgba(99, 102, 241, 0.9)",
     },
-    // Right side (MediaPipe left, since un-mirrored) — positioned at ~25% X
+    // Right side (MediaPipe left, since un-mirrored) — slightly wider
     {
         id: "R0",
         label: "G4",
-        x: 0.22,
+        x: 0.28,
         y: 0.22,
         size: 0.14,
         note: "G4",
@@ -72,7 +72,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "R1",
         label: "A4",
-        x: 0.22,
+        x: 0.28,
         y: 0.45,
         size: 0.14,
         note: "A4",
@@ -82,7 +82,7 @@ export const HAND_HIT_ZONES: HitZone[] = [
     {
         id: "R2",
         label: "C5",
-        x: 0.22,
+        x: 0.28,
         y: 0.68,
         size: 0.14,
         note: "C5",
@@ -90,6 +90,15 @@ export const HAND_HIT_ZONES: HitZone[] = [
         glowColor: "rgba(251, 113, 133, 0.9)",
     },
 ];
+
+// Kick directions mapping for depth kicks
+export const KICK_ZONES: Record<string, string> = {
+    // MediaPipe Right / Left Foot (since it's unmirrored coordinates in tracking)
+    "FL_FORWARD": "C2", // Left Kick Forward -> Kick
+    "FL_SIDE": "D2",    // Left Kick Side -> Snare
+    "FR_FORWARD": "E2", // Right Kick Forward -> Hi-Hat
+    "FR_SIDE": "F2",    // Right Kick Side -> Crash
+};
 
 /**
  * Check if a point (wrist) is inside a hit zone.

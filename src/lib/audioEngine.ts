@@ -2,6 +2,7 @@ import * as Tone from "tone";
 
 // Module-level singleton synth
 let synth: Tone.PolySynth | null = null;
+let drumSampler: Tone.Sampler | null = null;
 let isInitialized = false;
 
 /**
@@ -27,8 +28,22 @@ export async function initAudio(): Promise<void> {
   }).toDestination();
   synth.maxPolyphony = 6;
 
+  // Initialize Sampler for custom drum sounds
+  drumSampler = new Tone.Sampler({
+    urls: {
+      "C2": "kick.mp3",
+      "D2": "snare.mp3",
+      "E2": "hihat.mp3",
+      "F2": "crash.mp3",
+    },
+    baseUrl: "/drum-samples/",
+    onload: () => {
+      console.log("[AudioEngine] Drum sampler loaded.");
+    }
+  }).toDestination();
+
   isInitialized = true;
-  console.log("[AudioEngine] Tone.js started, synth ready.");
+  console.log("[AudioEngine] Tone.js started, synths ready.");
 }
 
 /**
@@ -37,11 +52,21 @@ export async function initAudio(): Promise<void> {
  * @param duration - Tone.js duration string, default "8n" (eighth note)
  */
 export function triggerNote(note: string, duration: string = "8n"): void {
-  if (!synth || !isInitialized) {
-    console.warn("[AudioEngine] Synth not initialized. Call initAudio() first.");
+  if (!isInitialized) {
+    console.warn("[AudioEngine] Audio not initialized. Call initAudio() first.");
     return;
   }
-  synth.triggerAttackRelease(note, duration);
+
+  // Check if the note is one of our mapped drum hits
+  if (["C2", "D2", "E2", "F2"].includes(note) && drumSampler) {
+    if (drumSampler.loaded) {
+      drumSampler.triggerAttackRelease(note, duration);
+    } else {
+      console.warn("[AudioEngine] Drum sampler not loaded yet.");
+    }
+  } else if (synth) {
+    synth.triggerAttackRelease(note, duration);
+  }
 }
 
 /**
@@ -58,6 +83,10 @@ export function disposeAudio(): void {
   if (synth) {
     synth.dispose();
     synth = null;
+  }
+  if (drumSampler) {
+    drumSampler.dispose();
+    drumSampler = null;
   }
   isInitialized = false;
 }

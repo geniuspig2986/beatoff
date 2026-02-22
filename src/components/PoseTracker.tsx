@@ -251,18 +251,118 @@ export default function PoseTracker() {
                 drawJoint(wrist.index, wrist.color);
             }
 
-            // Draw ankle dots (visual only for now, no audio)
+            // Process each ankle for depth kicks
             const ankles = [
-                { index: TARGET_JOINTS.leftAnkle, color: "#339af0" },
-                { index: TARGET_JOINTS.rightAnkle, color: "#fcc419" },
+                { index: TARGET_JOINTS.leftAnkle, color: "#339af0", isLeft: true },
+                { index: TARGET_JOINTS.rightAnkle, color: "#fcc419", isLeft: false },
             ];
 
+            const FORWARD_KICK_Z = -0.10; // Depth threshold (even easier)
+            const NEUTRAL_Z = -0.01;      // Reset Z (must be very close to hip depth)
+
+            const SIDE_KICK_X_LEFT_LEG = 0.70; // Physical left leg: kick outward past 0.70
+            const NEUTRAL_X_LEFT_LEG = 0.64;   // Physical left leg: reset inward past 0.64
+
+            const SIDE_KICK_X_RIGHT_LEG = 0.30; // Physical right leg: kick outward past 0.30
+            const NEUTRAL_X_RIGHT_LEG = 0.36;   // Physical right leg: reset inward past 0.36
+
+            const KICK_Y_THRESHOLD = 0.96; // Height threshold (much easier)
+
+            const drawAnkle = (index: number, color: string, isLeft: boolean) => {
+                const landmark = poses[index];
+                if (!landmark || landmark.visibility < 0.5) return;
+
+                const normX = landmark.x;
+                const normY = landmark.y;
+                const normZ = landmark.z;
+
+                // Track state by leg identity to allow cooldowns per physical limb
+                const legId = isLeft ? "LEFT_LEG" : "RIGHT_LEG";
+
+                let kickId: string | null = null;
+                let isKicking = false;
+
+                // --- 1. Detect if currently in a kicking pose ---
+
+                // Forward (depth) kick
+                if (normZ < FORWARD_KICK_Z) {
+                    kickId = isLeft ? "FL_FORWARD" : "FR_FORWARD";
+                    isKicking = true;
+                }
+                // Lateral (side) kick
+                else if (normY < KICK_Y_THRESHOLD) {
+                    if (isLeft && normX > SIDE_KICK_X_LEFT_LEG) {
+                        kickId = "FL_SIDE";
+                        isKicking = true;
+                    }
+                    else if (!isLeft && normX < SIDE_KICK_X_RIGHT_LEG) {
+                        kickId = "FR_SIDE";
+                        isKicking = true;
+                    }
+                }
+
+                // --- 2. Check if returned to neutral standing ---
+
+                let isNeutral = false;
+                if (!isKicking) {
+                    const depthOk = normZ > NEUTRAL_Z;
+                    const xOk = isLeft ? (normX < NEUTRAL_X_LEFT_LEG) : (normX > NEUTRAL_X_RIGHT_LEG);
+                    const groundedOk = normY > 0.88; // Looser grounding (0.88 is lower than hip level usually)
+
+                    if (depthOk && xOk) isNeutral = true;
+                    if (groundedOk) isNeutral = true;
+                }
+
+                // --- 3. Process Strike Logic with Cooldown ---
+
+                if (isKicking && kickId) {
+                    // Only strike if the leg wasn't already in a kick state (infinite cooldown)
+                    if (!activeZonesRef.current.has(legId)) {
+                        playZone(kickId);
+                        addEvent({
+                            timestamp: performance.now(),
+                            limb: kickId
+                        });
+
+                        // Mark the limb as "active" to prevent re-firing this action
+                        frameActiveZones.add(legId);
+                    } else {
+                        // Keep limb active while strike is held
+                        frameActiveZones.add(legId);
+                    }
+
+                    // Visual Label Feedback
+                    let kickLabel = "KICK";
+                    if (kickId.endsWith("_SIDE")) {
+                        kickLabel = isLeft ? "SNARE" : "CRASH";
+                    } else if (!isLeft) {
+                        kickLabel = "HI-HAT";
+                    }
+
+                    ctx.save();
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.font = "bold 32px monospace";
+                    ctx.textAlign = "center";
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                    ctx.fillText(kickLabel, mirrorX(normX), normY * canvas.height - 40);
+                    ctx.restore();
+
+                } else if (!isNeutral) {
+                    // Holding state: leg is mid-air but not yet returned to neutral
+                    if (activeZonesRef.current.has(legId)) {
+                        frameActiveZones.add(legId);
+                    }
+                }
+
+                // Draw the ankle tracking dot
+                const displayX = mirrorX(normX);
+                const displayY = normY * canvas.height;
+                drawWristDot(ctx, displayX, displayY, color, isKicking);
+            };
+
             for (const ankle of ankles) {
-                const landmark = poses[ankle.index];
-                if (!landmark || landmark.visibility < 0.5) continue;
-                const x = mirrorX(landmark.x);
-                const y = landmark.y * canvas.height;
-                drawWristDot(ctx, x, y, ankle.color, false);
+                drawAnkle(ankle.index, ankle.color, ankle.isLeft);
             }
         }
 
